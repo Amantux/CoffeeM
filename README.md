@@ -21,5 +21,7 @@ Deliverables
 •	Web interface and database synchronization  
 •	Webpage with user interface for users. Users can check/monitor their coffee consumption.
 
+Saeco Minuto Espresso Maker
+Main reason chosen is the fact that it has a diagnostic mode, so each individual mode can be triggered seperately
 
 
