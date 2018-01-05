@@ -6,17 +6,10 @@ import (
 	"io/ioutil"
 	"fmt"
 	"github.com/huin/goserial"
+	"log"
 	)
 //Find The Arduino
 func findarduino() string{
-	ports, err := enumerator.GetDetailedPortsList()
-	if err != nil {
-		log.Fatal(err)
-	}
-	if len(ports) == 0 {
-		fmt.Println("Error0000:No Ports Found")
-	return
-	}
 	contents, _ := ioutil.ReadDir("/dev")
 	for _, f := range contents {
 		if strings.Contains(f.Name(), "ttyUSB")|| strings.Contains(f.Name(), "tty.usbserial"){
@@ -38,7 +31,6 @@ func OpenSerial(port string, SerialRate int){
 //Opens Serial, returns open port
 
 
-
 //Open Serial Ports with Prior SettingS
 
 func OpenPort(Serial int){
@@ -52,14 +44,6 @@ func OpenPort(Serial int){
 func FormatMessage(message string){
 	return []byte(message)
 }
-func sendArduino(toUUID string, []command string, fromUUID string, serialPort io.ReadWriteCloser) error{
-	if serialPort == nil {
-		return "Error0002:No Serial Found"
-	}
-	bufOut := new(bytes.Buffer)
-	err := binary.Write(bufOut, binaryLittleEndian, argument)
-
-
 func main(){
 fmt.Println(findarduino())
 }
