@@ -5,7 +5,7 @@ import (
 	"strings"
 	"io/ioutil"
 	"fmt"
-	"go.bug.st/serial.v1"	
+	"github.com/huin/goserial"
 	)
 //Find The Arduino
 func findarduino() string{
@@ -26,15 +26,32 @@ func findarduino() string{
 	return "Error0001:Arduino Connection not found"
 }
 
-//Open The Serial Channels
-//Define Serial Comms
-mode := &serial.Mode{
-    BaudRate: 9600,
-    Parity:   serial.NoParity,
-    DataBits: 8,
-    StopBits: serial.OneStopBit,
+//Serial Config Session
+func OpenSerial(port string, SerialRate int){
+        c := &serial.Config{Name: "port", Baud: int}
+        s, err := serial.OpenPort(c)
+        if err != nil {
+                log.Fatal(err)
+	}
+	return s;
+}
+//Opens Serial, returns open port
+
+
+
+//Open Serial Ports with Prior SettingS
+
+func OpenPort(Serial int){
+	port, err := serial.Open(findarduino(), mode)
+	if err != nil {
+    log.Fatal(err)
+	}
 }
 
+//Format Message
+func FormatMessage(message string){
+	return []byte(message)
+}
 func sendArduino(toUUID string, []command string, fromUUID string, serialPort io.ReadWriteCloser) error{
 	if serialPort == nil {
 		return "Error0002:No Serial Found"
