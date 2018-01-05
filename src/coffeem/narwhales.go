@@ -28,7 +28,7 @@ func findarduino() string{
 
 //Serial Config Session
 func OpenSerial(port string, SerialRate int){
-        c := &serial.Config{Name: "port", Baud: int}
+        c := &serial.Config{Name: port, Baud: SerialRate}
         s, err := serial.OpenPort(c)
         if err != nil {
                 log.Fatal(err)
