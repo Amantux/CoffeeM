@@ -1,0 +1,4 @@
+# don't include vim temporary files
+*.swp
+# don't include golang bin directory - can always generate from source
+# bin/
