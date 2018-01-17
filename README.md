@@ -24,4 +24,4 @@ Deliverables
 Saeco Minuto Espresso Maker
 Main reason chosen is the fact that it has a diagnostic mode, so each individual mode can be triggered seperately
 
-
+Updated for NEW VM
