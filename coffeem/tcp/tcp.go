@@ -1,8 +1,11 @@
 package tcp
 
 import (
+	"fmt"
 	"log"
 	"net"
+	"os"
+	"regexp"
 	"sync"
 	"time"
 )
@@ -32,7 +35,7 @@ func Start(
 	msg chan<- Msg,
 	lgr *log.Logger,
 	wg *sync.WaitGroup,
-	status <-chan string,
+	status chan<- string,
 	term <-chan bool,
 ) (
 	err error,
@@ -45,47 +48,55 @@ func Start(
 	if l, err = net.ListenTCP("tcp", &addr); err != nil {
 		return
 	}
+	lg.Print("hi there!")
 	trig := make(chan bool)
 	defer close(trig)
 	wg.Add(1)
-	go connManager(c, msg, trig, wg, status, term)
+	go connManager(l, msg, trig, wg, status, term)
 	// block till connManager ready to accept messages
 	<-trig
 	return
 }
+
+const deadLineInterval = 10 * time.Minute
+
 func connManager(
 	l *net.TCPListener,
 	msg chan<- Msg,
 	trig chan<- bool,
 	wg *sync.WaitGroup,
-	status <-chan string,
+	status chan<- string,
 	term <-chan bool,
 ) {
 	defer wg.Done()
-	defer l.Close()
+	wg.Add(1)
+	go termListener(l, wg, term)
 	// signal connection manager started
 	trig <- true
-
+	const retryMax = 6
+	var retryAttempts int
 	for {
-		retryAttmpts := 0
+		retryAttempts = 0
 	connRetry:
 		retryAttempts += 1
-		conn, err := l.Accept()
+		conn, err := l.AcceptTCP()
 		if err != nil {
-			lg.Printf("Error Accepting: %s \n", err.Error())
-			if retryAttmpts < 5 {
-				lg.Printf("Retry Attmpt: %d of %d\n", retryAttempts, 5)
+			if eofDetected, _ := regexp.MatchString(".*closed network connection.*", err.Error()); eofDetected {
+				return
+			}
+			if retryAttempts < retryMax {
+				lg.Printf("Retry Attempt: %d of %d\n", retryAttempts, retryMax)
 				time.Sleep(time.Second * 2) //Gives it time to get its shit together
 				goto connRetry
 			}
-			status
-			lg.Printf("Error failed after %d retries. Connection: %v\n", retryAttmpts, conn)
+			status <- "Failure"
+			lg.Printf("Error failed after %d retries. Connection: %v\n", retryAttempts, conn)
 			status <- "Failure"
 			return
 		}
-		retryAttmpts := 0
-		timeoutDuration := 10 * time.Minute
-		if err := conn.SetReadDeadline(time.Now().Add(timeoutDuration)); err != nil {
+		fmt.Fprintf(os.Stderr, "after accept \n")
+
+		if err := conn.SetReadDeadline(time.Now().Add(deadLineInterval)); err != nil {
 			lg.Printf("Error Read Deadline: %s \n", err.Error())
 			status <- "Failure"
 			return
@@ -101,35 +112,49 @@ func connManager(
 			return
 		}
 		wg.Add(1)
-		go readMessage(c, msg, wg, term)
+		go readMessage(conn, msg, wg, term)
 	}
 }
 func readMessage(
-	conn *net.Conn,
+	conn *net.TCPConn,
 	msg chan<- Msg,
 	wg *sync.WaitGroup,
 	term <-chan bool,
 ) {
 	defer wg.Done()
 	wg.Add(1)
-	go closeConn(conn, term)
+	go closeConn(conn, wg, term)
 	for {
 		m := NewMsg()
-		if len, err := conn.Read(m.Pld); err != nil || len != PktSz {
+		if len, err := conn.Read(m.Pld); err != nil {
+			if closed, _ := regexp.MatchString(".*closed network connection.*|.*EOF.*", err.Error()); closed {
+				return
+			}
 			lg.Printf("Error Reading: %s size of %d \n", err.Error(), len)
 		}
-		if err := conn.SetReadDeadline(time.Now().Add(timeoutDuration)); err != nil {
+		if err := conn.SetReadDeadline(time.Now().Add(deadLineInterval)); err != nil {
 			lg.Printf("Error Read Deadline: %s \n", err.Error())
 			return
 		}
+		fmt.Fprintf(os.Stderr, "In read message.\n")
+		msg <- *m
 	}
 }
-func closeConn(
-	conn *net.Conn,
+func termListener(
+	l *net.TCPListener,
 	wg *sync.WaitGroup,
 	term <-chan bool,
 ) {
 	<-term
-	conn.close()
+	l.Close()
+	wg.Done()
+}
+func closeConn(
+	conn *net.TCPConn,
+	wg *sync.WaitGroup,
+	term <-chan bool,
+) {
+	<-term
+	conn.Close()
 	wg.Done()
 }
