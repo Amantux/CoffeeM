@@ -58,7 +58,7 @@ func Start(
 	status chan<- string,
 	term <-chan bool,
 ) (
-	msgOut chan<- Msg,
+	msgOut <-chan Msg,
 	err error,
 ) {
 	lg = lgr
@@ -69,7 +69,7 @@ func Start(
 	if l, err = net.ListenTCP("tcp", &addr); err != nil {
 		return
 	}
-	lg.Print("Info: Listening for TCP connections on: '%s'.", addr.String())
+	lg.Printf("Info: Listening for TCP connections on: '%s'.", addr.String())
 	trig := make(chan bool)
 	defer close(trig)
 	msg := make(chan Msg)
@@ -93,7 +93,7 @@ func connManager(
 ) {
 	defer wg.Done()
 	defer close(msg)
-	lg.Print("Info: Accepting TCP connections")
+	lg.Printf("Info: Accepting TCP connections")
 	wg.Add(1)
 	go termListener(l, wg, term)
 	// signal connection manager started
@@ -134,7 +134,7 @@ func connManager(
 			status <- "Failure"
 			return
 		}
-		lg.Print("Info: Established client connection from: '%s'.", conn.RemoteAddr().String())
+		lg.Printf("Info: Established client connection from: '%s'.", conn.RemoteAddr().String())
 		wg.Add(1)
 		go readMessage(conn, msg, wg, term)
 	}
