@@ -25,7 +25,8 @@ func main() {
 		lg.Fatalf("Fatal: Could not start server: '%s'.", err.Error())
 		os.Exit(1)
 	}
-	go relay(msgOut, lg)
+	queueOut := startQueue(msgOut, lg)
+	relayOut := startRelay(queueOut, lg)
 	//go msgPrint(msgOut, lg, &wg)
 	// coordinate graceful terination
 	select {
@@ -35,9 +36,41 @@ func main() {
 		termMyself()
 		<-term
 	}
+	<-relayOut
 	wg.Wait()
 }
-func relay(msg <-chan tcp.Msg, lg *log.Logger) {
+
+func startQueue(msgIn <-chan tcp.Msg, lg *log.Logger) <-chan tcp.Msg {
+	msgChan := make(chan tcp.Msg, 20)
+	go queue(msgIn, msgChan, lg)
+	return msgChan
+}
+
+func queue(msgIn <-chan tcp.Msg, msgChan chan tcp.Msg, lg *log.Logger) {
+	defer close(msgChan)
+	for {
+		select {
+		case msg, open := <-msgIn:
+			if !open {
+				return
+			}
+			select {
+			case msgChan <- msg:
+			default:
+				lg.Printf("Error: Exceeded queue size: processing message:'%v'", msg)
+			}
+		}
+	}
+}
+
+func startRelay(msgIn <-chan tcp.Msg, lg *log.Logger) <-chan bool {
+	killChan := make(chan bool)
+	go relay(msgIn, killChan, lg)
+	return killChan
+}
+
+func relay(msg <-chan tcp.Msg, killChan chan<- bool, lg *log.Logger) {
+	defer close(killChan)
 	var arduino *tcp.Msg
 	var Nexus *tcp.Msg
 	for m := range msg {
