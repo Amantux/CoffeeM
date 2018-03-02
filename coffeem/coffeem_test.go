@@ -43,5 +43,23 @@ func TestMessageOverflow(t *testing.T) {
 }
 func TestRelay(t *testing.T) {
 	lg := log.New(os.Stderr, "Relay:", log.LstdFlags)
+	reply := make(chan tcp.Msg)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go msgPrint(reply, lg, &wg)
 	Input := make(chan tcp.Msg)
+	Output := startRelay(Input, lg)
+	mAr := tcp.NewMsg()
+	mAr.Pld = []byte("Arduino")
+	mAr.ReplySet(reply)
+	mNx := tcp.NewMsg()
+	mNx.Pld = []byte("Nexus")
+	Input <- *mAr
+	Input <- *mNx
+	close(Input)
+
+	<-Output
+	close(reply)
+	wg.Wait()
+
 }
