@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"regexp"
 	"sync"
 	"time"
@@ -28,11 +29,22 @@ func NewMsg() (m *Msg) {
 	m.Pld = make([]byte, PktSz)
 	return
 }
+
+// These functions are for debug only and should not be used in production
+func (m *Msg) ReplySet(rch chan Msg) {
+	m.reply = rch
+}
+func (m Msg) ReplyPrint(label string) {
+	fmt.Fprintf(os.Stderr, "ReplyPrint: %s: %v \n", label, m.reply)
+}
+
+//End of debug functions
 func (m Msg) Reply(pld []byte) (err error) {
 	if m.reply == nil {
 		err = fmt.Errorf("No connection to issue to reply.")
 		return
 	}
+	copy(m.Pld, pld)
 	tout := m.replyTOut
 	if m.replyTOut == 0 {
 		tout = 1 * time.Second
