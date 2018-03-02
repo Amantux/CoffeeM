@@ -71,17 +71,21 @@ func startRelay(msgIn <-chan tcp.Msg, lg *log.Logger) <-chan bool {
 
 func relay(msg <-chan tcp.Msg, killChan chan<- bool, lg *log.Logger) {
 	defer close(killChan)
-	var arduino *tcp.Msg
-	var Nexus *tcp.Msg
+	var arduino tcp.Msg
+	var ardRec bool
+	var Nexus tcp.Msg
+	var NxRec bool
 	for m := range msg {
 		payload := string(m.Pld)
 		lg.Printf("Info: Received Message:'%s'.", payload)
 		if strings.HasPrefix(payload, "Arduino") {
-			arduino = &m
-		} else if strings.HasPrefix(payload, "Nexus") && Nexus != nil {
-			Nexus = &m
+			arduino = m
+			ardRec = true
+		} else if strings.HasPrefix(payload, "Nexus") {
+			Nexus = m
+			NxRec = true
 		}
-		if Nexus != nil && arduino != nil {
+		if NxRec && ardRec {
 			err := arduino.Reply(Nexus.Pld)
 			if err != nil {
 				lg.Printf("Error: line 49: '%s'.", err.Error())
