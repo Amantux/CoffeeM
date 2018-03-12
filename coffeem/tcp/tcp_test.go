@@ -68,7 +68,7 @@ func Test_OneMsg(t *testing.T) {
 	msgClient := make(chan Msg)
 	var wgClient sync.WaitGroup
 	wgClient.Add(1)
-	go sendMsg(t, cfg, msgClient, &wgClient)
+	go sendMsg(t, cfg, "localhost", msgClient, &wgClient)
 	lg.Print("Client: Generating Messages")
 	genMsg(t, 1, msgClient)
 	close(msgClient)
@@ -88,7 +88,7 @@ func Test_OneMsg(t *testing.T) {
 	wgServerOut.Wait()
 }
 
-func XTest_TwoMsg(t *testing.T) {
+func Test_TwoMsg(t *testing.T) {
 	cfg := Config{
 		IPListen: "127.0.0.1",
 		Port:     randPort(),
@@ -113,7 +113,7 @@ func XTest_TwoMsg(t *testing.T) {
 	msgClient := make(chan Msg)
 	var wgClient sync.WaitGroup
 	wgClient.Add(1)
-	go sendMsg(t, cfg, msgClient, &wgClient)
+	go sendMsg(t, cfg, "localhost", msgClient, &wgClient)
 	lg.Print("Client: Generating Messages")
 	genMsg(t, 2, msgClient)
 	close(msgClient)
@@ -158,7 +158,7 @@ func Test_1000Msg(t *testing.T) {
 	msgClient := make(chan Msg)
 	var wgClient sync.WaitGroup
 	wgClient.Add(1)
-	go sendMsg(t, cfg, msgClient, &wgClient)
+	go sendMsg(t, cfg, "localhost", msgClient, &wgClient)
 	lg.Print("Client: Generating Messages")
 	genMsg(t, 1000, msgClient)
 	close(msgClient)
@@ -184,24 +184,50 @@ func genMsg(t *testing.T, tot uint16, msg chan<- Msg) {
 		msg <- *m
 	}
 }
+func Test_OneMsgContainer(t *testing.T) {
+	cfg := Config{
+		IPListen: "172.17.0.3",
+		Port:     10001,
+	}
+	lg := log.New(os.Stderr, "Pi:", log.LstdFlags)
+	term := make(chan bool)
+	go termRasPI(term)
+	// start the client
+	msgClient := make(chan Msg)
+	var wgClient sync.WaitGroup
+	wgClient.Add(1)
+	go sendMsg(t, cfg, "", msgClient, &wgClient)
+	lg.Print("Client: Generating Messages")
+	genMsg(t, 100, msgClient)
+	close(msgClient)
+	wgClient.Wait()
+	lg.Print("Client Complete")
+	// coordinate graceful terination
+	select {
+	case <-term:
+	}
+}
 
-func sendMsg(t *testing.T, cfg Config, msg <-chan Msg, wg *sync.WaitGroup) {
+func sendMsg(t *testing.T, cfg Config, clientIP string, msg <-chan Msg, wg *sync.WaitGroup) {
 	defer wg.Done()
 	// resolve address to server
 	t.Logf("Resolve Server Address.\n")
+	fmt.Fprintf(os.Stderr, "resolving server address %v \n", cfg)
 	tcpendpt := cfg.IPListen
 	tcpendpt += ":" + strconv.Itoa(cfg.Port)
 	ServerAddr, errServ := net.ResolveTCPAddr("tcp", tcpendpt)
 	assert.NoError(t, errServ)
 	// resolve address of this client
-	tcpendpt = "localhost"
+	tcpendpt = clientIP
 	tcpendpt += ":" + strconv.Itoa(cfg.Port+1)
 	t.Logf("Resolve Client Address.\n")
+	fmt.Fprintf(os.Stderr, "resolving client address %s \n", tcpendpt)
 	LocalAddr, errLcl := net.ResolveTCPAddr("tcp", tcpendpt)
 	assert.NoError(t, errLcl)
 	// open connection between this cliend and its server
 	t.Logf("Dialing Server.\n")
 	t.Logf("Dialing server: '%s' client: '%s'\n", ServerAddr.String(), LocalAddr.String())
+	fmt.Fprintf(os.Stderr, "dialing server %v, %v \n", LocalAddr, ServerAddr)
 	Conn, errConn := net.DialTCP("tcp", LocalAddr, ServerAddr)
 	if errConn != nil {
 		t.Fatalf("Error: making connection\n")
@@ -212,10 +238,12 @@ func sendMsg(t *testing.T, cfg Config, msg <-chan Msg, wg *sync.WaitGroup) {
 	assert.NoError(t, Conn.SetWriteBuffer(PktSz))
 	// send messages over the connection
 	t.Logf("Sending messages.\n")
+	fmt.Fprintf(os.Stderr, "going to send messages\n")
 	msgTot := 0
 	for m := range msg {
 		_, err := Conn.Write(m.Pld)
 		assert.NoError(t, err)
+		fmt.Fprintf(os.Stderr, "sending message %d \n", msgTot)
 		msgTot++
 		t.Logf("Info: Sending message: '%d'. ", msgTot)
 	}
@@ -238,6 +266,21 @@ func randPort() int {
 	return 1000 + portOffset
 }
 
+/*
+func ipv4Get() (ipv4 string, err error) {
+	var IPs []net.Addr
+	if IPs, err = net.InterfaceAddrs(); err != nil {
+		return
+	}
+	for _, ip := range IPs {
+		if match, err := regexp.MatchString("[0-9]+.[0-9]+.[0-9]+.[0-9]+", ip.String()); match {
+			return ip.String(), err
+		}
+	}
+	err = fmt.Errorf("Can't find IPV4 interface.")
+	return
+}
+*/
 func termRasPI(term chan bool) {
 	osSig := make(chan os.Signal)
 	defer close(osSig)
