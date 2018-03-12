@@ -25,9 +25,9 @@ func main() {
 		lg.Fatalf("Fatal: Could not start server: '%s'.", err.Error())
 		os.Exit(1)
 	}
-	queueOut := startQueue(msgOut, lg)
-	relayOut := startRelay(queueOut, lg)
-	//go msgPrint(msgOut, lg, &wg)
+	// queueOut := startQueue(msgOut, lg)
+	// relayOut := startRelay(queueOut, lg)
+	go msgPrint(msgOut, lg, &wg)
 	// coordinate graceful terination
 	select {
 	case <-term:
@@ -36,7 +36,7 @@ func main() {
 		termMyself()
 		<-term
 	}
-	<-relayOut
+	//<-relayOut
 	wg.Wait()
 }
 
