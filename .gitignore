@@ -2,3 +2,5 @@
 *.swp
 # don't include golang bin directory - can always generate from source
 # bin/
+# don't include built executable
+coffeem/coffeem
