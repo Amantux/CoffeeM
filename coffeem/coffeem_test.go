@@ -63,3 +63,23 @@ func TestRelay(t *testing.T) {
 	wg.Wait()
 
 }
+
+func TestArduinoLinkReset(t *testing.T) {
+	lg := log.New(os.Stderr, "Relay:", log.LstdFlags)
+	reply := make(chan tcp.Msg)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go msgPrint(reply, lg, &wg)
+	Input := make(chan tcp.Msg)
+	Output := startRelay(Input, lg)
+	mAr := tcp.NewMsg()
+	mAr.Pld = []byte("Arduino Link Reset")
+	mAr.ReplySet(reply)
+	Input <- *mAr
+	close(Input)
+
+	<-Output
+	close(reply)
+	wg.Wait()
+
+}

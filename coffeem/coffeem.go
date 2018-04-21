@@ -25,9 +25,9 @@ func main() {
 		lg.Fatalf("Fatal: Could not start server: '%s'.", err.Error())
 		os.Exit(1)
 	}
-	// queueOut := startQueue(msgOut, lg)
-	// relayOut := startRelay(queueOut, lg)
-	go msgPrint(msgOut, lg, &wg)
+	queueOut := startQueue(msgOut, lg)
+	relayOut := startRelay(queueOut, lg)
+	// for debugging go msgPrint(msgOut, lg, &wg)
 	// coordinate graceful terination
 	select {
 	case <-term:
@@ -36,7 +36,7 @@ func main() {
 		termMyself()
 		<-term
 	}
-	//<-relayOut
+	<-relayOut
 	wg.Wait()
 }
 
@@ -84,6 +84,10 @@ func relay(msg <-chan tcp.Msg, killChan chan<- bool, lg *log.Logger) {
 		} else if strings.HasPrefix(payload, "Nexus") {
 			Nexus = m
 			NxRec = true
+		}
+		if strings.HasPrefix(payload, "Arduino Link Reset") {
+			lg.Printf("Info: Arduino Link Reset: '%s'.", payload)
+			continue
 		}
 		if NxRec && ardRec {
 			err := arduino.Reply(Nexus.Pld)
